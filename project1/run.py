@@ -10,7 +10,7 @@ from sklearn.preprocessing import scale
 import torch
 from torch.utils.data import Dataset, DataLoader
 from torch import nn
-from model import BpNet
+from model import BpNet, RbfNet
 import matplotlib.pyplot as plt
 
 
@@ -56,7 +56,7 @@ class MyDataset3(Dataset):  # predict all 5 params in one model
         return self.data.shape[0]
 
 
-def run_net(n_epochs, learning_rate, net_size, plot_loss=False):
+def run_net(n_epochs, learning_rate, net_size, network_type, plot_loss=False):
     # Check if GPU is available
     device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
 
@@ -77,31 +77,36 @@ def run_net(n_epochs, learning_rate, net_size, plot_loss=False):
     test_set = DataLoader(dataset2, dataset2.__len__(), shuffle=False)
 
     # Define network, loss function, optimizer
-    bp_net = BpNet(net_size).to(device)
+    if network_type == 'BpNet':
+        net = BpNet(net_size).to(device)
+    if network_type == 'RbfNet':
+        centers = torch.rand(net_size[0],net_size[1])
+        net = RbfNet(centers,net_size[2]).to(device)
+
     criterion = nn.MSELoss()
-    optimizer = torch.optim.Adam(bp_net.parameters(), lr=learning_rate)
+    optimizer = torch.optim.Adam(net.parameters(), lr=learning_rate)
 
     avg_tr_loss, avg_tt_loss = [], []
     for epoch in range(n_epochs):
         # Training
-        bp_net.train()
+        net.train()
         total_tr_loss = 0
         for x, y in training_set:
             optimizer.zero_grad()
             x, y = x.to(device), y.to(device)
-            pred = bp_net(x)
+            pred = net(x)
             tr_loss = criterion(pred, y)
             tr_loss.backward()
             optimizer.step()
             total_tr_loss += tr_loss.item()
 
         # Validation
-        bp_net.eval()
+        net.eval()
         total_tt_loss = 0
         for x, y in test_set:
             x, y = x.to(device), y.to(device)
             with torch.no_grad():  # disable gradient calculation
-                pred = bp_net(x)
+                pred = net(x)
                 tt_loss = criterion(pred, y)
             total_tt_loss += tt_loss.item() * len(x)
 
@@ -121,4 +126,5 @@ def run_net(n_epochs, learning_rate, net_size, plot_loss=False):
 
 
 if __name__ == '__main__':
-    run_net(1000, 0.01, (5, 5, 12, 1), plot_loss=True)
+    # run_net(1000, 0.01, (5, 5, 12, 4), 'BpNet', plot_loss=True)
+    run_net(1000, 0.01, (300, 5, 4), 'RbfNet', plot_loss=True)

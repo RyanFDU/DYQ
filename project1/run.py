@@ -80,8 +80,8 @@ def run_net(n_epochs, learning_rate, net_size, network_type, plot_loss=False):
     if network_type == 'BpNet':
         net = BpNet(net_size).to(device)
     if network_type == 'RbfNet':
-        centers = torch.rand(net_size[0],net_size[1])
-        net = RbfNet(centers,net_size[2]).to(device)
+        centers = torch.rand(net_size[0], net_size[1])
+        net = RbfNet(centers, net_size[2]).to(device)
 
     criterion = nn.MSELoss()
     optimizer = torch.optim.Adam(net.parameters(), lr=learning_rate)
@@ -126,5 +126,5 @@ def run_net(n_epochs, learning_rate, net_size, network_type, plot_loss=False):
 
 
 if __name__ == '__main__':
-    # run_net(1000, 0.01, (5, 5, 12, 4), 'BpNet', plot_loss=True)
-    run_net(1000, 0.01, (300, 5, 4), 'RbfNet', plot_loss=True)
+    # run_net(1000, 0.01, (5, 5, 12, 4), 'BpNet', plot_loss=True)   # bp_net
+    run_net(1000, 0.01, (300, 5, 4), 'RbfNet', plot_loss=True)  # rbf_net

@@ -5,7 +5,6 @@ Four network class were put into model.py
 Remember the net_size param controls the choice of target y as well.
 You can freely predict all last 5 params in 1 net by using MyDataset3
 '''
-from operator import ne
 import numpy as np
 from sklearn.preprocessing import scale
 import torch
@@ -20,7 +19,7 @@ class MyDataset1(Dataset):  # predict G_f
         self.data = np.loadtxt(file, dtype=np.float32)
         # standardization by column
         self.x = scale(self.data[:, :5])
-        self.y = scale(self.data[:, 5:6])#.reshape((-1,1))
+        self.y = scale(self.data[:, 5:6])  #.reshape((-1,1))
 
     def __getitem__(self, index):
         return self.x[index], self.y[index]
@@ -81,9 +80,11 @@ def run_net(n_epochs, learning_rate, net_size, network_type, plot_loss=False):
     if network_type == 'BpNet':
         net = BpNet(net_size).to(device)
     if network_type == 'RbfNet':
-        centers = torch.rand(net_size[0],net_size[1])
-        net = RbfNet(centers,net_size[2]).to(device)
+        centers = torch.rand(net_size[0], net_size[1])
+        net = RbfNet(centers, net_size[2]).to(device)
     if network_type == 'GRNNet':
+        dataset1.x = torch.from_numpy(dataset1.x).to(device)
+        dataset1.y = torch.from_numpy(dataset1.y).to(device)
         net = GRNNet(dataset1.x, dataset1.y).to(device)
 
     criterion = nn.MSELoss()
@@ -130,7 +131,6 @@ def run_net(n_epochs, learning_rate, net_size, network_type, plot_loss=False):
 
 
 if __name__ == '__main__':
-    # run_net(1000, 0.01, (5, 5, 12, 4), 'BpNet', plot_loss=True)
-    # run_net(1000, 0.01, (300, 5, 4), 'RbfNet', plot_loss=True)
-    run_net(1000, 0.01, (5,4), network_type='GRNNet', plot_loss=True)
-
+    # run_net(1000, 0.01, (5, 5, 12, 4), network_type='BpNet', plot_loss=True)
+    # run_net(1000, 0.01, (300, 5, 4), network_type='RbfNet', plot_loss=True)
+    run_net(1000, 0.01, (5, 1), network_type='GRNNet', plot_loss=True)

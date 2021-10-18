@@ -80,5 +80,4 @@ class GRNNet(nn.Module):
             1, self.y_training.size(1))  #view(-1,1)
         psum2 = torch.mm(radial_val, self.y_training)
         output = psum2 / psum1
-
         return output

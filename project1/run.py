@@ -5,6 +5,7 @@ Four network class were put into model.py
 Remember the net_size param controls the choice of target y as well.
 You can freely predict all last 5 params in 1 net by using MyDataset3
 '''
+from numpy import *
 import numpy as np
 from sklearn.preprocessing import scale
 import torch
@@ -55,6 +56,20 @@ class MyDataset3(Dataset):  # predict all 5 params in one model
     def __len__(self):
         return self.data.shape[0]
 
+class MyDataset4(Dataset):  # use net to predict the real model fuel consumpotion
+    def __init__(self, file) -> None:
+        self.data = np.loadtxt(file, dtype=np.float32)
+        # standardization by column
+        self.x = scale(self.data[:5])
+
+    def __getitem__(self, index):
+        return self.x[index]
+
+    def __len__(self):
+        return self.data.shape[0]
+
+
+
 
 def run_net(n_epochs, learning_rate, net_size, network_type, plot_loss=False):
     # Check if GPU is available
@@ -62,14 +77,14 @@ def run_net(n_epochs, learning_rate, net_size, network_type, plot_loss=False):
 
     # Load data w.r.t net_size
     if net_size[-1] == 1:
-        dataset1 = MyDataset1(file='./project1/training.txt')
-        dataset2 = MyDataset1(file='./project1/test.txt')
+        dataset1 = MyDataset1(file='training.txt')
+        dataset2 = MyDataset1(file='test.txt')
     elif net_size[-1] == 4:
-        dataset1 = MyDataset2(file='./project1/training.txt')
-        dataset2 = MyDataset2(file='./project1/test.txt')
+        dataset1 = MyDataset2(file='training.txt')
+        dataset2 = MyDataset2(file='test.txt')
     elif net_size[-1] == 5:
-        dataset1 = MyDataset3(file='./project1/training.txt')
-        dataset2 = MyDataset3(file='./project1/test.txt')
+        dataset1 = MyDataset3(file='training.txt')
+        dataset2 = MyDataset3(file='test.txt')
     else:
         print('output wrong size!')
         return
@@ -103,7 +118,7 @@ def run_net(n_epochs, learning_rate, net_size, network_type, plot_loss=False):
             tr_loss.backward()
             optimizer.step()
             total_tr_loss += tr_loss.item()
-            print(net.beta)
+            # print(net.beta)
 
         # Validation
         net.eval()
@@ -112,12 +127,27 @@ def run_net(n_epochs, learning_rate, net_size, network_type, plot_loss=False):
             x, y = x.to(device), y.to(device)
             with torch.no_grad():  # disable gradient calculation
                 pred = net(x)
+                # print(pred)
                 tt_loss = criterion(pred, y)
             total_tt_loss += tt_loss.item() * len(x)
 
         print('epoch: {} test loss: {:.4f}'.format(epoch, tt_loss))
         avg_tr_loss.append(total_tr_loss / len(test_set.dataset))
         avg_tt_loss.append(total_tt_loss / len(test_set.dataset))
+
+    # net.eval()
+    # total_tt_loss = 0
+    # for x, y in test_set:
+    #     x, y = x.to(device), y.to(device)
+    #     with torch.no_grad():  # disable gradient calculation
+    #         pred = net(x)
+    #         print(pred)
+    #         tt_loss = criterion(pred, y)
+    #     total_tt_loss += tt_loss.item() * len(x)
+    #
+    # print('epoch: {} test loss: {:.4f}'.format(epoch, tt_loss))
+    # avg_tr_loss.append(total_tr_loss / len(test_set.dataset))
+    # avg_tt_loss.append(total_tt_loss / len(test_set.dataset))
 
     if plot_loss:
         fig = plt.figure(dpi=150, figsize=(8, 4))
@@ -128,9 +158,30 @@ def run_net(n_epochs, learning_rate, net_size, network_type, plot_loss=False):
         f2.plot(np.arange(len(avg_tt_loss)), avg_tt_loss)
         f2.set_title('test loss')
         plt.show()
+    return net
+
+def runNetForReal(net):
+    device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
+    set = MyDataset4(file='realAirplane.txt')
+    # for i in set:print(i)
+    test_set = DataLoader(set, set.__len__(), shuffle=False)
+    net.eval()
+    # test_set= test_set.to(device)
+    for x in test_set:
+        x = x.to(device)
+        with torch.no_grad():  # disable gradient calculation
+            pred = net(x)
+    # print(pred)
+    return pred
+
 
 
 if __name__ == '__main__':
-    # run_net(1000, 0.01, (5, 5, 12, 4), network_type='BpNet', plot_loss=True)
-    # run_net(1000, 0.01, (300, 5, 4), network_type='RbfNet', plot_loss=True)
-    run_net(1000, 0.01, (5, 1), network_type='GRNNet', plot_loss=True)
+    pred=[]
+    for i in range(10):
+        net = run_net(1000, 0.01, (5, 5, 12, 1), network_type='BpNet', plot_loss=False)
+        # run_net(1000, 0.01, (300, 5, 4), network_type='RbfNet', plot_loss=True)
+        # run_net(1000, 0.01, (5, 1), network_type='GRNNet', plot_loss=True)
+        pred.append(runNetForReal(net))
+    print(pred)
+    print(mean(pred))

@@ -15,7 +15,7 @@ torch.set_printoptions(linewidth=120)
 torch.set_grad_enabled(True)
 
 
-# 一、数据准备
+# 一、数据准备，会自动在当前目录下下载数据集
 train_set = torchvision.datasets.FashionMNIST(
     root='./data/FashionMNIST'
     , train=True

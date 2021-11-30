@@ -34,8 +34,7 @@ def train(net_name, num_classes, image_path):
         ])
     }
 
-    train_dataset = datasets.ImageFolder(root=os.path.join(
-        image_path, "train"),
+    train_dataset = datasets.ImageFolder(root=os.path.join(image_path, "train"),
                                          transform=data_transform["train"])
     train_num = len(train_dataset)
 

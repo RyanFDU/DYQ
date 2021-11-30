@@ -200,4 +200,4 @@ def predict(netname, num_classes, img_path):
 
 if __name__ == '__main__':
     train('resnet34', 10, './images')
-    # predict('resnet34', 5, './imgs/test.jpg')
+    # predict('resnet34', 10, './images/test/1.jpg')

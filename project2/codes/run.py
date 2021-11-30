@@ -16,7 +16,7 @@ def train(net_name, num_classes, image_path):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print("using {} device.".format(device))
 
-    # based on cifar-100
+    # Imagenet to Cifar10
     data_transform = {
         "train":
         transforms.Compose([
@@ -34,8 +34,7 @@ def train(net_name, num_classes, image_path):
         ])
     }
 
-    train_dataset = datasets.ImageFolder(root=os.path.join(image_path, "train"),
-                                         transform=data_transform["train"])
+    train_dataset = datasets.CIFAR10(root=os.path.join(image_path, "train"), train=True, download=True, transform=data_transform["train"])
     train_num = len(train_dataset)
 
     # {'daisy':0, 'dandelion':1, 'roses':2, 'sunflower':3, 'tulips':4}
@@ -56,9 +55,7 @@ def train(net_name, num_classes, image_path):
                                                shuffle=True,
                                                num_workers=nw)
 
-    validate_dataset = datasets.ImageFolder(root=os.path.join(
-        image_path, "val"),
-                                            transform=data_transform["val"])
+    validate_dataset = datasets.CIFAR10(root=os.path.join(image_path, "val"), train=False, download=True, transform=data_transform["val"])
     val_num = len(validate_dataset)
     validate_loader = torch.utils.data.DataLoader(validate_dataset,
                                                   batch_size=batch_size,
@@ -68,10 +65,10 @@ def train(net_name, num_classes, image_path):
     print("using {} images for training, {} images for validation.".format(
         train_num, val_num))
 
-    net = utils.get_network(net_name)
+    net = utils.get_network(net_name, use_gpu=True)
     # load pretrain weights
     # download url: https://download.pytorch.org/models/resnet34-333f7ec4.pth
-    model_weight_path = "./resnet34-pre.pth"
+    model_weight_path = "./models/resnet34-pre.pth"
     assert os.path.exists(model_weight_path), "file {} does not exist.".format(
         model_weight_path)
     net.load_state_dict(torch.load(model_weight_path, map_location=device))
@@ -92,7 +89,7 @@ def train(net_name, num_classes, image_path):
 
     epochs = 3
     best_acc = 0.0
-    save_path = './resNet34.pth'
+    save_path = './models/resNet34.pth'
     train_steps = len(train_loader)
     for epoch in range(epochs):
         # train
@@ -193,5 +190,5 @@ def predict(netname, num_classes, img_path):
 
 
 if __name__ == '__main__':
-    train('resnet34', 5, './imgs')
-    predict('resnet34', 5, './imgs/test.jpg')
+    train('resnet34', 10, './images')
+    # predict('resnet34', 5, './imgs/test.jpg')

@@ -79,3 +79,6 @@ def vgg(model_name="vgg16", **kwargs):
 
     model = VGG(make_features(cfg), **kwargs)
     return model
+
+if __name__ == '__main__':
+    vgg_model = vgg()

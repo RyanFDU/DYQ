@@ -34,20 +34,26 @@ def train(net_name, num_classes, image_path):
         ])
     }
 
-    train_dataset = datasets.CIFAR10(root=os.path.join(image_path, "train"), train=True, download=True, transform=data_transform["train"])
+    train_dataset = datasets.CIFAR10(root=os.path.join(image_path, "train"),
+                                     train=True,
+                                     download=True,
+                                     transform=data_transform["train"])
     train_num = len(train_dataset)
 
-    # {'daisy':0, 'dandelion':1, 'roses':2, 'sunflower':3, 'tulips':4}
-    flower_list = train_dataset.class_to_idx
-    cla_dict = dict((val, key) for key, val in flower_list.items())
+    # {"0": "airplane", "1": "automobile", "2": "bird", "3": "cat", "4": "deer",
+    # "5": "dog", "6": "frog", "7": "horse", "8": "ship", "9": "truck"}
+    feature_list = train_dataset.class_to_idx
+    cla_dict = dict((val, key) for key, val in feature_list.items())
     # write dict into json file
     json_str = json.dumps(cla_dict, indent=4)
     with open('class_indices.json', 'w') as json_file:
         json_file.write(json_str)
 
-    batch_size = 16
-    nw = min([os.cpu_count(), batch_size if batch_size > 1 else 0,
-              8])  # number of workers
+    batch_size = 8
+    nw = min([
+        os.cpu_count(),
+        batch_size if batch_size > 1 else 0,
+    ])  # number of workers
     print('Using {} dataloader workers every process'.format(nw))
 
     train_loader = torch.utils.data.DataLoader(train_dataset,
@@ -55,7 +61,10 @@ def train(net_name, num_classes, image_path):
                                                shuffle=True,
                                                num_workers=nw)
 
-    validate_dataset = datasets.CIFAR10(root=os.path.join(image_path, "val"), train=False, download=True, transform=data_transform["val"])
+    validate_dataset = datasets.CIFAR10(root=os.path.join(image_path, "val"),
+                                        train=False,
+                                        download=True,
+                                        transform=data_transform["val"])
     val_num = len(validate_dataset)
     validate_loader = torch.utils.data.DataLoader(validate_dataset,
                                                   batch_size=batch_size,
@@ -68,7 +77,7 @@ def train(net_name, num_classes, image_path):
     net = utils.get_network(net_name, use_gpu=True)
     # load pretrain weights
     # download url: https://download.pytorch.org/models/resnet34-333f7ec4.pth
-    model_weight_path = "./models/resnet34-pre.pth"
+    model_weight_path = "./params/resnet34-pre.pth"
     assert os.path.exists(model_weight_path), "file {} does not exist.".format(
         model_weight_path)
     net.load_state_dict(torch.load(model_weight_path, map_location=device))
@@ -89,7 +98,7 @@ def train(net_name, num_classes, image_path):
 
     epochs = 3
     best_acc = 0.0
-    save_path = './models/resNet34.pth'
+    save_path = './params/resnet34.pth'
     train_steps = len(train_loader)
     for epoch in range(epochs):
         # train

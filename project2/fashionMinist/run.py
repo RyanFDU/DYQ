@@ -40,7 +40,6 @@ print(torch.__version__)
 print(torchvision.__version__)
 
 for run in RunBuilder.get_runs(params):
-
     network = Network()
     loader = DataLoader(train_set, batch_size=run.batch_size, shuffle=run.shuffle)
     optimizer = optim.Adam(network.parameters(), lr=run.lr)
@@ -60,3 +59,6 @@ for run in RunBuilder.get_runs(params):
     m.end_run()
 m.save('results')
 print('End of Train')
+
+# 如果想要查看tensorboard，在Terminal内首先键入“cd project2/fashionMinist”
+# 然后键入"tensorboard --logdir=runs"，打开http://localhost:6006/

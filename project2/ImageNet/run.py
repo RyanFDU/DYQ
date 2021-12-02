@@ -382,5 +382,5 @@ def plot_confusion_matrix(cm, classes, normalize=False, title='Confusion matrix'
 if __name__ == '__main__':
     features_blobs = []
     # train('resnet34', 10, './images')
-    # testAccuracy('resnet34', 10, './images')
+    testAccuracy('resnet34', 10, './images')
     # predict('resnet34', 10, './images/test/3.jpg')

@@ -14,6 +14,10 @@ import matplotlib.pyplot as plt
 import cv2
 import numpy as np
 
+import matplotlib.pyplot as plt
+from sklearn.metrics import confusion_matrix
+import itertools
+
 
 def train(net_name, num_classes, image_path):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -40,7 +44,8 @@ def train(net_name, num_classes, image_path):
     train_dataset = datasets.CIFAR10(root=os.path.join(image_path, "train"), train=True, download=True, transform=data_transform["train"])
     train_num = len(train_dataset)
 
-    # {'daisy':0, 'dandelion':1, 'roses':2, 'sunflower':3, 'tulips':4}
+    # {"0": "airplane", "1": "automobile", "2": "bird", "3": "cat", "4": "deer",
+    # "5": "dog", "6": "frog", "7": "horse", "8": "ship", "9": "truck"}
     flower_list = train_dataset.class_to_idx
     cla_dict = dict((val, key) for key, val in flower_list.items())
     # write dict into json file
@@ -50,7 +55,7 @@ def train(net_name, num_classes, image_path):
 
     batch_size = 16
     nw = min([os.cpu_count(), batch_size if batch_size > 1 else 0,
-              8])  # number of workers
+              3])  # number of workers
     print('Using {} dataloader workers every process'.format(nw))
 
     train_loader = torch.utils.data.DataLoader(train_dataset,
@@ -72,8 +77,8 @@ def train(net_name, num_classes, image_path):
     # load pretrain weights
     model_weight_path = "./params/resnet34-pre.pth"
     if not os.access(model_weight_path, os.W_OK):
-        synset_url = 'https://download.pytorch.org/models/resnet34-333f7ec4.pth'
-        os.system('wget ' + synset_url)
+        synset_url = ' https://download.pytorch.org/models/resnet34-333f7ec4.pth'
+        os.system('wget --restrict-file-names=nocontrol ' + synset_url)
         os.system('mv ./resnet34-333f7ec4.pth ./params/resnet34-pre.pth')
         
     # assert os.path.exists(model_weight_path), "file {} does not exist.".format(
@@ -84,6 +89,7 @@ def train(net_name, num_classes, image_path):
 
     # change fc layer structure
     in_channel = net.fc.in_features
+    print(num_classes)
     net.fc = nn.Linear(in_channel, num_classes)
     net.to(device)
 
@@ -143,7 +149,7 @@ def train(net_name, num_classes, image_path):
 
 
 def predict(netname, num_classes, img_path):
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cpu")
 
     data_transform = transforms.Compose([
         transforms.Resize(256),
@@ -254,7 +260,117 @@ def returnCAM(feature_conv, weight_softmax, class_idx):
         output_cam.append(cv2.resize(cam_img, size_upsample))
     return output_cam
 
+def testAccuracy(net_name, num_classes, image_path):
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    print("using {} device.".format(device))
+    # Imagenet to Cifar10
+    data_transform = {
+        "test":
+            transforms.Compose([
+                transforms.Resize(256),
+                transforms.CenterCrop(224),
+                transforms.ToTensor(),
+                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+            ])
+    }
+
+    batch_size = 16
+    nw = min([os.cpu_count(), batch_size if batch_size > 1 else 0,
+              3])  # number of workers
+    print('Using {} dataloader workers every process'.format(nw))
+
+    test_dataset = datasets.CIFAR10(root=os.path.join(image_path, "val"), train=False, download=True,
+                                        transform=data_transform["test"])
+    test_num = len(test_dataset)
+    test_loader = torch.utils.data.DataLoader(test_dataset,
+                                                  batch_size=batch_size,
+                                                  shuffle=False,
+                                                  num_workers=nw)
+
+    print("using  {} images for test.".format(test_num))
+
+    device = torch.device("cpu")
+    # read class_indict
+    json_path = './class_indices.json'
+    assert os.path.exists(json_path), "file: '{}' dose not exist.".format(
+        json_path)
+    json_file = open(json_path, "r")
+    class_indict = json.load(json_file)
+    # create model
+    model = utils.get_network(net_name, num_classes, use_gpu=False)
+    weights_path = "./params/resNet34.pth"
+    model.load_state_dict(torch.load(weights_path, map_location=device))
+
+    # hacky way to deal with the upgraded batchnorm2D and avgpool layers...
+    for i, (name, module) in enumerate(model._modules.items()):
+        module = recursion_change_bn(model)
+    model.avgpool = torch.nn.AvgPool2d(kernel_size=7, stride=1, padding=0)
+
+    model.eval()
+
+    # hook the feature extractor
+    features_names = ['layer4', 'avgpool']  # this is the last conv layer of the resnet
+    for name in features_names:
+        model._modules.get(name).register_forward_hook(hook_feature)
+    params = list(model.parameters())
+    weight_softmax = params[-2].data.numpy()
+    weight_softmax[weight_softmax < 0] = 0
+
+    # test
+    # validate
+    model.eval()
+    acc = 0.0  # accumulate accurate number / epoch
+    with torch.no_grad():
+        all_preds = torch.tensor([])
+        val_bar = tqdm(test_loader)
+        for val_data in val_bar:
+            val_images, val_labels = val_data
+            outputs = model(val_images.to(device))
+            # loss = loss_function(outputs, test_labels)
+            predict_y = torch.max(outputs, dim=1)[1]
+            acc += torch.eq(predict_y, val_labels.to(device)).sum().item()
+            all_preds = torch.cat((all_preds, outputs), dim=0)
+            val_bar.desc = "valid epoch[{}/{}]".format(1, 1)
+
+    val_accurate = acc / test_num
+    print(' val_accuracy: %.3f' % ( val_accurate))
+
+    cm = confusion_matrix(test_dataset.targets, all_preds.argmax(dim=1))
+    print(cm)
+    names = ("airplane",  "automobile", "bird", "cat",  "deer","dog", "frog", "horse",
+             "ship","truck")
+    plt.figure(figsize=(10, 10))
+    plot_confusion_matrix(cm, names)
+    print('')
+
+
+def plot_confusion_matrix(cm, classes, normalize=False, title='Confusion matrix', cmap=plt.cm.Blues):
+    if normalize:
+        cm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
+        print("Normalized confusion matrix")
+    else:
+        print('Confusion matrix, without normalization')
+    print(cm)
+    plt.imshow(cm, interpolation='nearest', cmap=cmap)
+    plt.title(title)
+    plt.colorbar()
+    tick_marks = np.arange(len(classes))
+    plt.xticks(tick_marks, classes, rotation=45)
+    plt.yticks(tick_marks, classes)
+
+    fmt = '.2f' if normalize else 'd'
+    thresh = cm.max() / 2.
+    for i, j in itertools.product(range(cm.shape[0]), range(cm.shape[1])):
+        plt.text(j, i, format(cm[i, j], fmt), horizontalalignment="center", color="white" if cm[i, j] > thresh else "black")
+
+    plt.tight_layout()
+    plt.ylabel('True label')
+    plt.xlabel('Predicted label')
+    plt.show()
+    plt.savefig('./confusion_matrix.png')  # 保存图片
+
 if __name__ == '__main__':
     features_blobs = []
-    train('resnet34', 10, './images')
+    # train('resnet34', 10, './images')
+    # testAccuracy('resnet34', 10, './images')
     # predict('resnet34', 10, './images/test/3.jpg')

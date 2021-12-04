@@ -53,7 +53,7 @@ def train(net_name, num_classes, image_path):
     cla_dict = dict((val, key) for key, val in flower_list.items())
     # write dict into json file
     json_str = json.dumps(cla_dict, indent=4)
-    with open('class_indices.json', 'w') as json_file:
+    with open('./project2/ImageNet/class_indices.json', 'w') as json_file:
         json_file.write(json_str)
 
     batch_size = 16
@@ -81,12 +81,14 @@ def train(net_name, num_classes, image_path):
 
     net = utils.get_network(net_name, use_gpu=True)
     # load pretrain weights
-    model_weight_path = "./params/resnet34-pre.pth"
+    model_weight_path = "./project2/ImageNet/params/resnet34-pre.pth"
     if not os.access(model_weight_path, os.W_OK):
         synset_url = 'https://download.pytorch.org/models/resnet34-333f7ec4.pth'
         os.system('wget ' + synset_url)
-        os.system('mkdir ./params')
-        os.system('mv ./resnet34-333f7ec4.pth ./params/resnet34-pre.pth')
+        os.system('mkdir ./project2/ImageNet/params')
+        os.system(
+            'mv ./project2/ImageNet/resnet34-333f7ec4.pth ./project2/ImageNet/params/resnet34-pre.pth'
+        )
 
     # assert os.path.exists(model_weight_path), "file {} does not exist.".format(
     #     model_weight_path)
@@ -108,7 +110,7 @@ def train(net_name, num_classes, image_path):
 
     epochs = 3
     best_acc = 0.0
-    save_path = './params/resNet34.pth'
+    save_path = './project2/ImageNet/params/resNet34.pth'
     train_steps = len(train_loader)
     for epoch in range(epochs):
         # train
@@ -175,7 +177,7 @@ def predict(netname, num_classes, img_path):
     img = torch.unsqueeze(img, dim=0)
 
     # read class_indict
-    json_path = './class_indices.json'
+    json_path = './project2/ImageNet/class_indices.json'
     assert os.path.exists(json_path), "file: '{}' dose not exist.".format(
         json_path)
 
@@ -183,8 +185,8 @@ def predict(netname, num_classes, img_path):
     class_indict = json.load(json_file)
 
     # create model
-    model = utils.get_network(netname, num_classes, use_gpu=False)
-    weights_path = "./params/resNet34.pth"
+    model = utils.get_network(netname, num_classes, use_gpu=True)
+    weights_path = "./project2/ImageNet/params/resNet34.pth"
     model.load_state_dict(torch.load(weights_path, map_location=device))
 
     # hacky way to deal with the upgraded batchnorm2D and avgpool layers...
@@ -207,7 +209,7 @@ def predict(netname, num_classes, img_path):
         predict_cla = torch.argmax(predict).numpy()
 
     params = list(model.parameters())
-    weight_softmax = params[-2].data.numpy()
+    weight_softmax = params[-2].data.cpu().numpy()
     weight_softmax[weight_softmax < 0] = 0
 
     # logit = model.forward(img)
@@ -235,7 +237,7 @@ def predict(netname, num_classes, img_path):
     heatmap = cv2.applyColorMap(cv2.resize(CAMs[0], (width, height)),
                                 cv2.COLORMAP_JET)
     result = heatmap * 0.4 + img * 0.5
-    cv2.imwrite('cam.jpg', result)
+    cv2.imwrite('/project2/ImageNet/cam.jpg', result)
     result = result.astype(np.uint8)
     cv2.imshow('', result)
     k = cv2.waitKey(0)
@@ -270,18 +272,19 @@ def returnCAM(feature_conv, weight_softmax, class_idx):
         output_cam.append(cv2.resize(cam_img, size_upsample))
     return output_cam
 
+
 def testAccuracy(net_name, num_classes, image_path):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print("using {} device.".format(device))
     # Imagenet to Cifar10
     data_transform = {
         "test":
-            transforms.Compose([
-                transforms.Resize(256),
-                transforms.CenterCrop(224),
-                transforms.ToTensor(),
-                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-            ])
+        transforms.Compose([
+            transforms.Resize(256),
+            transforms.CenterCrop(224),
+            transforms.ToTensor(),
+            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+        ])
     }
 
     batch_size = 16
@@ -289,26 +292,28 @@ def testAccuracy(net_name, num_classes, image_path):
               3])  # number of workers
     print('Using {} dataloader workers every process'.format(nw))
 
-    test_dataset = datasets.CIFAR10(root=os.path.join(image_path, "val"), train=False, download=True,
-                                        transform=data_transform["test"])
+    test_dataset = datasets.CIFAR10(root=os.path.join(image_path, "val"),
+                                    train=False,
+                                    download=True,
+                                    transform=data_transform["test"])
     test_num = len(test_dataset)
     test_loader = torch.utils.data.DataLoader(test_dataset,
-                                                  batch_size=batch_size,
-                                                  shuffle=False,
-                                                  num_workers=nw)
+                                              batch_size=batch_size,
+                                              shuffle=False,
+                                              num_workers=nw)
 
     print("using  {} images for test.".format(test_num))
 
     device = torch.device("cpu")
     # read class_indict
-    json_path = './class_indices.json'
+    json_path = './project2/ImageNet/class_indices.json'
     assert os.path.exists(json_path), "file: '{}' dose not exist.".format(
         json_path)
     json_file = open(json_path, "r")
     class_indict = json.load(json_file)
     # create model
     model = utils.get_network(net_name, num_classes, use_gpu=False)
-    weights_path = "./params/resNet34.pth"
+    weights_path = "./project2/ImageNet/params/resNet34.pth"
     model.load_state_dict(torch.load(weights_path, map_location=device))
 
     # hacky way to deal with the upgraded batchnorm2D and avgpool layers...
@@ -319,7 +324,8 @@ def testAccuracy(net_name, num_classes, image_path):
     model.eval()
 
     # hook the feature extractor
-    features_names = ['layer4', 'avgpool']  # this is the last conv layer of the resnet
+    features_names = ['layer4',
+                      'avgpool']  # this is the last conv layer of the resnet
     for name in features_names:
         model._modules.get(name).register_forward_hook(hook_feature)
     params = list(model.parameters())
@@ -343,18 +349,22 @@ def testAccuracy(net_name, num_classes, image_path):
             val_bar.desc = "valid epoch[{}/{}]".format(1, 1)
 
     val_accurate = acc / test_num
-    print(' val_accuracy: %.3f' % ( val_accurate))
+    print(' val_accuracy: %.3f' % (val_accurate))
 
     cm = confusion_matrix(test_dataset.targets, all_preds.argmax(dim=1))
     print(cm)
-    names = ("airplane",  "automobile", "bird", "cat",  "deer","dog", "frog", "horse",
-             "ship","truck")
+    names = ("airplane", "automobile", "bird", "cat", "deer", "dog", "frog",
+             "horse", "ship", "truck")
     plt.figure(figsize=(10, 10))
     plot_confusion_matrix(cm, names)
     print('')
 
 
-def plot_confusion_matrix(cm, classes, normalize=False, title='Confusion matrix', cmap=plt.cm.Blues):
+def plot_confusion_matrix(cm,
+                          classes,
+                          normalize=False,
+                          title='Confusion matrix',
+                          cmap=plt.cm.Blues):
     if normalize:
         cm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
         print("Normalized confusion matrix")
@@ -371,16 +381,21 @@ def plot_confusion_matrix(cm, classes, normalize=False, title='Confusion matrix'
     fmt = '.2f' if normalize else 'd'
     thresh = cm.max() / 2.
     for i, j in itertools.product(range(cm.shape[0]), range(cm.shape[1])):
-        plt.text(j, i, format(cm[i, j], fmt), horizontalalignment="center", color="white" if cm[i, j] > thresh else "black")
+        plt.text(j,
+                 i,
+                 format(cm[i, j], fmt),
+                 horizontalalignment="center",
+                 color="white" if cm[i, j] > thresh else "black")
 
     plt.tight_layout()
     plt.ylabel('True label')
     plt.xlabel('Predicted label')
     plt.show()
-    plt.savefig('./confusion_matrix.png')  # 保存图片
+    plt.savefig('./project2/ImageNet/confusion_matrix.png')  # 保存图片
+
 
 if __name__ == '__main__':
     features_blobs = []
-    # train('resnet34', 10, './images')
-    testAccuracy('resnet34', 10, './images')
-    # predict('resnet34', 10, './images/test/3.jpg')
+    train('resnet34', 10, './project2/ImageNet/images')
+    # testAccuracy('resnet34', 10, './project2/ImageNet/images')
+    # predict('resnet34', 10, './project2/ImageNet/images/test/3.jpg')
